@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract TTT is ERC20, Ownable {
     mapping(address => bool) private whitelisted;
     address public ICOAddress;
+    bool public ICOActive;
 
     constructor() ERC20("TimelockTransferToken", "TTT") {
         _mint(_msgSender(), 1000000 * 10 ** decimals());
@@ -18,19 +19,21 @@ contract TTT is ERC20, Ownable {
         whitelisted[member] = true;
     }
 
-    function createICO(uint supply) public onlyOwner {
+    function createICO(uint supply) public {
         ICOAddress = address(new ICO(address(this)));
-        transfer(ICOAddress, supply);
+        ICOActive = true;
         IICO(ICOAddress).setICOState(true);
+        transfer(ICOAddress, supply);
         whitelisted[ICOAddress] = true;
     }
 
     function setICOState(bool state) onlyOwner public {
         IICO(ICOAddress).setICOState(state);
+        ICOActive = state;
     }
 
     function transfer(address recipient, uint amount) public override returns(bool){
-        if(IICO(ICOAddress).ICOActive())
+        if(ICOActive)
             require(whitelisted[_msgSender()], "Not authorized to transfer until the end of ICO");
         _transfer(_msgSender(), recipient, amount);
         return true;
@@ -40,9 +43,9 @@ contract TTT is ERC20, Ownable {
 contract ICO {
     address tokenAddress;
     bool ICOActive;
-    uint8 private constant TOKENS_PER_ETH_STAGE1 = 42;
-    uint8 private constant TOKENS_PER_ETH_STAGE2 = 21;
-    uint8 private constant TOKENS_PER_ETH_STAGE3 = 8;
+    uint private constant TOKENS_PER_ETH_STAGE1 = 42 * 1e18;
+    uint private constant TOKENS_PER_ETH_STAGE2 = 21 * 1e18;
+    uint private constant TOKENS_PER_ETH_STAGE3 = 8 * 1e18;
     uint private stage1;
     uint private stage2;
     uint private stage3;
@@ -50,8 +53,8 @@ contract ICO {
 
     constructor(address token) {
         stage1 = block.timestamp + 3 days;
-        stage2 = block.timestamp + 30 days + stage1;
-        stage3 = block.timestamp + 2 weeks + stage2;
+        stage2 = 30 days + stage1;
+        stage3 = 2 weeks + stage2;
         tokenAddress = token;
     }
 
